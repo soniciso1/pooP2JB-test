@@ -65,7 +65,7 @@ body{
        &burn=1                  DANGER: sprays after every close, PANICKED the kernel in
                                 v73. Do not use. -->
 <a class="btn" id="btnp2jb"
-   href="p2jb.html?go=1&amp;auto=1&amp;trigger=netcontrol&amp;payload=1&amp;v=126"
+   href="p2jb.html?go=1&amp;auto=1&amp;trigger=netcontrol&amp;payload=1&amp;v=127"
    tabindex="0">P2JB</a>
 
 <!-- sockets= is deliberately NOT forced here any more. poops.html's own default is 80
@@ -88,18 +88,9 @@ body{
      calls - it has its own stage3_cleanup plus post-jb repair, and has ended sessions
      without panicking. Remove &nullfds=1 to revert. -->
 <a class="btn" id="btnpoops"
-   href="poops.html?go=1&amp;auto=1&amp;trigger=netcontrol&amp;payload=1&amp;nullfds=1&amp;v=126"
+   href="poops.html?go=1&amp;auto=1&amp;trigger=netcontrol&amp;payload=1&amp;nullfds=1&amp;v=127"
    tabindex="0">Poopsploit</a>
 
-<!-- PREFLIGHT (third option, added because the PS5 browser has no address bar - a
-     diagnostic you cannot type is a diagnostic nobody runs). Same code path as a real
-     run but with a tiny syscall budget: it proves the offsets load, the WebKit primitive
-     lands, the libkernel call path works and the pthread spawn succeeds, then stops
-     before the ~45 minute cr_ref feed. On a new firmware this catches a bad offset in
-     about two minutes instead of at minute 70 of a full run. It does NOT jailbreak. -->
-<a class="btn" id="btnpreflight"
-   href="p2jb.html?go=1&amp;auto=1&amp;trigger=netcontrol&amp;payload=1&amp;preflight=1&amp;skipleak=1&amp;v=126"
-   tabindex="0">Preflight test (~2 min, no jailbreak)</a>
 
 
 <div id="msg"></div>
