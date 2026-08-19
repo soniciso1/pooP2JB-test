@@ -804,9 +804,41 @@ window.liveStatus = (function () {
         return el;
     }
 
+
+    /* "DO NOT TURN OFF" BANNER.
+       From the drain onward the exploit holds the JS thread in tight loops, so the 1 Hz
+       repaint above cannot run and the clock visibly stalls for stretches. That is normal,
+       but a frozen-looking screen ~45 minutes into a run is exactly when someone reaches
+       for the power button - and pulling power here throws away the whole leak.
+       The banner appears once the leak is done and stays up until the payload menu
+       replaces the run UI (showPayloadMenu hides every body child except the menu, so it
+       clears itself without any extra bookkeeping). */
+    var warnEl = null;
+    function ensureWarn() {
+        if (warnEl) return warnEl;
+        warnEl = document.createElement("div");
+        warnEl.id = "nokill";
+        warnEl.style.cssText =
+            "margin:8px 0;padding:10px 12px;border:2px solid #b3261e;border-radius:8px;"
+            + "background:#2a0f0f;color:#ff6b6b;text-align:center;letter-spacing:.03em;"
+            + "font:700 16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif";
+        warnEl.textContent = "DO NOT TURN OFF OR RESTART - WAIT UNTIL ELFLDR BEGINS";
+        var line2 = document.createElement("div");
+        line2.style.cssText = "margin-top:4px;color:#e0a0a0;font:400 13px/1.4 system-ui,sans-serif";
+        line2.textContent = "the clock may stop moving for a while here - that is normal";
+        warnEl.appendChild(line2);
+        var e = ensureEl();
+        if (e && e.parentNode) e.parentNode.insertBefore(warnEl, e.nextSibling);
+        return warnEl;
+    }
+    var WARN_FROM = ORDER.indexOf("drain");
+
     function render() {
         try {
             if (!el) return;
+            try {
+                if (WARN_FROM >= 0 && ORDER.indexOf(key) >= WARN_FROM) ensureWarn();
+            } catch (e) { }
             var now = Date.now();
             var phaseSecs = (now - t0) / 1000;
             var runSecs = (now - RUN_T0) / 1000;
