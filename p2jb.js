@@ -4454,9 +4454,29 @@
          * read would hang rather than fail, and hanging here would be worse than the
          * panic warning the operator already gets. */
         try {
+            /* OPT-IN ONLY (?teardownguard=1).
+             *
+             * This is the one thing on this page that touches kernel memory outside the
+             * proven exploit path, and it has never fired on hardware. Tonight a different
+             * post-kexp kernel write of mine - guarded the same way, on an address that
+             * looked just as sound - panicked a console. The lesson applies here: an
+             * unproven kernel access must not sit in the default path of a build people
+             * rely on.
+             *
+             * With the flag absent, this block does nothing at all - not even the read -
+             * so the kernel-access surface of a normal run is exactly what it was before
+             * this guard existed. What that costs is the abort-path protection: after a
+             * FAILED run, master.pipe_buffer.buffer is left pointing at victim_pipe_data
+             * and closing the page can still take Fatal trap 12 in pipe_free_kmem. That is
+             * the pre-existing behaviour, not a regression.
+             *
+             * To prove it, run with ?teardownguard=1 and abort deliberately: it should
+             * report TEARDOWN-GUARD with the old value and a clean read-back. Once that
+             * has been seen on hardware it can go back to being the default. */
+            const guardOn = /[?&]teardownguard=1/i.test(String(location.search || ""));
             const wedged = /executor is dead|sync poll timed out/i.test(
                 String((fatal_err && fatal_err.message) || ""));
-            if (S_ref && S_ref.master_pipe_data && !wedged) {
+            if (guardOn && S_ref && S_ref.master_pipe_data && !wedged) {
                 const buf_now = S_ref.kread64(S_ref.master_pipe_data + 0x10n);
                 if (buf_now !== 0n) {
                     S_ref.kwrite64(S_ref.master_pipe_data + 0x10n, 0n);
