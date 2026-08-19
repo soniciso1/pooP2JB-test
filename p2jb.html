@@ -282,8 +282,8 @@ otherwise.</div>
      at ?v=77 while it was edited, and the console kept running the stale copy - the
      fix looked applied on disk and was invisible on hardware. rop.js/syscalls.js had
      NO ?v= at all, which is the same trap with no warning. -->
-<script src="rop.js?v=125"></script>
-<script src="main.js?v=125"></script>
+<script src="rop.js?v=126"></script>
+<script src="main.js?v=126"></script>
 <script>window.offsetsReady = new Promise(function (res, rej) {
     var s = document.querySelector('script[src^="offsets/"]');
     if (!s) return rej(new Error("offsets script was never injected by main.js"));
@@ -294,21 +294,21 @@ otherwise.</div>
     });
 });
 </script>
-<script src="syscalls.js?v=125"></script>
+<script src="syscalls.js?v=126"></script>
 
-<script type="module">import { establishPrimitive, fakeCellReleased } from "./core.js?v=125";
-import { installWindowP, pairStatus } from "./mem.js?v=125";
+<script type="module">import { establishPrimitive, fakeCellReleased } from "./core.js?v=126";
+import { installWindowP, pairStatus } from "./mem.js?v=126";
 import { int64 } from "./int64.js";
 import { BANNED, ERRNO, K, r32, r16, w32, hexBytes, coreList }
-    from "./poops.js?v=125";
+    from "./poops.js?v=126";
 
 let PK = null, makePoopsEngine = null, buildLadder = null;
 
 async function loadPoopsModules() {
-    const lib = await import("./poops.js?v=125");
+    const lib = await import("./poops.js?v=126");
 
-    await import("./poops.js?v=125");
-    const st = await import("./poops.js?v=125");
+    await import("./poops.js?v=126");
+    const st = await import("./poops.js?v=126");
     PK = lib.PK;
     makePoopsEngine = lib.makePoopsEngine;
     buildLadder = st.buildLadder;
@@ -2076,10 +2076,10 @@ async function main() {
             });
             try {
                 if (!window.POOPS) throw new Error("window.POOPS not published by prepare()");
-                await loadScript("rop-worker.js?v=125");   // sync syscall executor (fireSync)
-                await loadScript("p2jb_lk.js?v=125");       // per-fw libkernel_web offsets for rop-worker
-                await loadScript("p2jb_poops.js?v=125");    // Y2JB adapter (sync syscall via rop-worker)
-                await loadScript("p2jb.js?v=125");          // exploit module (unchanged, sync)
+                await loadScript("rop-worker.js?v=126");   // sync syscall executor (fireSync)
+                await loadScript("p2jb_lk.js?v=126");       // per-fw libkernel_web offsets for rop-worker
+                await loadScript("p2jb_poops.js?v=126");    // Y2JB adapter (sync syscall via rop-worker)
+                await loadScript("p2jb.js?v=126");          // exploit module (unchanged, sync)
                 flushMark("P2JB-LOADED", "adapter+module on poopsploit primitives");
             } catch (e) {
                 /* This reported ONLY through flushMark. Served from a static host there is no
