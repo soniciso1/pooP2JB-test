@@ -8501,28 +8501,20 @@ export function makePoopsEngine(X) {
     try {
       const name = o.elfName || "elfldr-ps5-1360.elf";
       flushMark("STAGE5-HEAD-PRE", "url=../payloads/" + name);
-      let declared = 0;
-      let preBuf = null;
-      try {
-        const head = await fetch("payloads/" + name, { method: "HEAD" });
-        declared = parseInt(head.headers.get("content-length") || "0", 10);
-      } catch (e) {
-        declared = 0;   /* HEAD refused outright - fall through to the GET below */
-      }
-      if (!(declared > 0)) {
-        /* Not every host answers HEAD with a Content-Length: a proxy can drop it, and a
-           chunked response has none at all. Aborting there kills an otherwise healthy run at
-           the very last stage - seen live as "stage 5: could not stage the elfldr: no
-           content-length for elfldr-ps5-1360.elf" with every earlier stage green. The
-           reference implementation never used HEAD at all; it fetched the ELF and took its
-           .length. Do that as a fallback, and keep the bytes so it costs one request. */
+        /* NEVER size this from Content-Length. GitHub Pages gzips the payloads, so a HEAD
+           there returns the COMPRESSED length (Content-Encoding: gzip) while fetch()
+           transparently inflates the GET - elfldr would be staged at a quarter of its real
+           size and the run would die at the very last stage, on the hosted site only.
+           HEAD was unreliable for a second reason too: a proxy can drop the header and a
+           chunked response has none, which produced "no content-length for
+           elfldr-ps5-1360.elf" with every earlier stage green.
+           jordyidk/slopkit and zecoxao/slopdev never use HEAD - they fetch the ELF and take
+           its .length. One request, and the size cannot disagree with the bytes. */
         const r = await fetch("payloads/" + name, { cache: "no-store" });
-        if (!r.ok)
-          throw new Error("no content-length for " + name + " and GET -> HTTP " + r.status);
-        preBuf = new Uint8Array(await r.arrayBuffer());
-        declared = preBuf.length;
-        flushMark("STAGE5-HEAD-FALLBACK", name + "-bytes=" + declared + "-via=GET");
-      }
+        if (!r.ok) throw new Error("GET " + name + " -> HTTP " + r.status);
+        const preBuf = new Uint8Array(await r.arrayBuffer());
+        const declared = preBuf.length;
+        flushMark("STAGE5-BYTES", name + "-bytes=" + declared + "-via=GET");
       /* Sanity-bound the size before it becomes an mmap length - a bogus Content-Length would
          otherwise be mapped verbatim. 16 MB is the reference's ceiling, ~40x the real elfldr. */
       if (!(declared >= 4 && declared <= 0x1000000))
@@ -9236,10 +9228,20 @@ export function makePoopsEngine(X) {
      GitHub Pages, with no PHP/Node helper at all. Same sockaddr layout as the ps0
      elfldr liveness probe above (len=16, AF_INET, port 9021 big-endian, 127.0.0.1). */
   async function sendElfDirect(name) {
-    const head = await fetch("payloads/" + name, { method: "HEAD" });
-    if (!head.ok) throw new Error("HEAD " + name + " -> " + head.status);
-    const declared = parseInt(head.headers.get("content-length") || "0", 10);
-    if (!(declared > 0)) throw new Error("no content-length for " + name);
+    /* SIZE FROM THE BYTES, NOT FROM content-length.
+       GitHub Pages gzips these payloads, so a HEAD there reports the COMPRESSED length:
+           Content-Length: 51285   Content-Encoding: gzip      (the real ELF is 192320)
+       fetch() then transparently decompresses the GET, so sizing the mapping from that
+       header allocated a quarter of what actually arrived: the copy overran, the ELF
+       check failed, and the tile went red. Our own host does not compress, which is why
+       this only ever failed on the hosted site and never in local testing.
+       jordyidk/slopkit and zecoxao/slopdev both just read response.arrayBuffer() and use
+       its length - no HEAD, no content-length, nothing that can disagree with the bytes. */
+    const resp = await fetch("payloads/" + name, { cache: "no-store" });
+    if (!resp.ok) throw new Error("GET " + name + " -> " + resp.status);
+    const elfBytes = new Uint8Array(await resp.arrayBuffer());
+    const declared = elfBytes.length;
+    if (!(declared > 0)) throw new Error("empty payload " + name);
 
     const mapped = (declared + PK.PAGE - 1) & ~(PK.PAGE - 1);
     const mr = await sys(PSYS.MMAP, i64(0, 0), mapped, PK.PROT_RW,
@@ -9248,19 +9250,18 @@ export function makePoopsEngine(X) {
       throw new Error("mmap 0x" + mapped.toString(16) + " failed: " + mr.errText);
     const buf = mr.raw;
 
-    let first4 = null;
-    const g = await fetchInto("payloads/" + name, (off, chunk) => {
-      if (first4 === null) first4 = chunk.slice(0, 4);
-      const base = buf.add32(off);
+    /* The bytes are already in hand, so copy them straight in - same writer as the old
+       streaming sink, just fed from the buffer instead of a reader. */
+    const first4 = elfBytes.slice(0, 4);
+    {
+      const base = buf;
       let i = 0;
-      const n4 = chunk.length & ~3;
+      const n4 = declared & ~3;
       for (; i < n4; i += 4)
-        P.write4(base.add32(i), chunk[i] | (chunk[i + 1] << 8) |
-                                (chunk[i + 2] << 16) | (chunk[i + 3] << 24));
-      for (; i < chunk.length; ++i) P.write1(base.add32(i), chunk[i]);
-    });
-    if (g.total !== declared)
-      throw new Error("size changed mid-fetch: " + declared + " -> " + g.total);
+        P.write4(base.add32(i), elfBytes[i] | (elfBytes[i + 1] << 8) |
+                                (elfBytes[i + 2] << 16) | (elfBytes[i + 3] << 24));
+      for (; i < declared; ++i) P.write1(base.add32(i), elfBytes[i]);
+    }
     /* elfldr rejects anything that is not an ELF at offset 0, so check before we spend a
        socket on it - a 404 page fetched as an ELF would otherwise be written verbatim. */
     if (!first4 || first4[0] !== 0x7f || first4[1] !== 0x45 ||
