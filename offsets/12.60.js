@@ -3,7 +3,7 @@
 
 // host-constructor candidates: webkitBase = nativeCtorAddr - hc
 const OFFSET_wk_host_constructor_candidates = [0x0003A888, 0x0003AAD0, 0x0003BB18];
-const OFFSET_wk_vtable_first_element     = 0; // needs a console
+const OFFSET_wk_vtable_first_element     = 0x0028EF30; // derived: unique `mov eax,0x37; ret` slot0, verified identical in all six 12.x modules
 const OFFSET_wk_memset_import                  = 0x03510238;
 const OFFSET_wk___stack_chk_guard_import       = 0x0350DB88;
 
