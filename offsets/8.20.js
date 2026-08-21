@@ -3,7 +3,21 @@
 
 // no host-constructor value for this firmware
 const OFFSET_wk_host_constructor_candidates = [];
-const OFFSET_wk_vtable_first_element     = 0; // needs a console
+/* Re-derived 2026-08-21. The previous value came from a 'unique mov eax,0x37; ret'
+ * heuristic and was WRONG for this whole range - on 7.00 it pointed at 0x65C4E0,
+ * which is slot 0 of a single 3-slot vtable, not a DOM element. main.js does:
+ *   vt = read8(read8(leakval(textarea)+0x18)); base = read8(vt) - THIS
+ * so this must be the target of slot 0 of HTMLTextAreaElement's vtable. That
+ * function is a base virtual shared by exactly 214 large (>=100 slot) vtables
+ * on EVERY firmware 6.00-8.60, which is how it is identified.
+ * Cross-checked on a 7.00 devkit: the leaked vtable[0] was 0x818865720, and
+ * 0x3D720 is the only large-vtable slot0 whose value mod 0x4000 matches, giving
+ * base 0x818828000 - 16K aligned and in the user-module band. The old value
+ * produced 0x818209240, which is not page aligned, and every module base
+ * derived from it (lk, lc) came out as garbage.
+ * previous (wrong): 0x00167120 */
+const OFFSET_wk_vtable_first_element     = 0x00504F40;
+
 const OFFSET_wk_memset_import                  = 0x03DF6F28;
 const OFFSET_wk___stack_chk_guard_import       = 0x03DF4938;
 
@@ -381,3 +395,40 @@ let syscall_map = {
 	0x2D5: 0x0001B3D0,
 	0x2DC: 0x0001B940,
 };
+
+// ---- derived offline 2026-08-20 (NID / signature / xref), UNTESTED on hardware ----
+const OFFSET_lk_getpid                              = 0x0001A4E0;
+const OFFSET_lk_pthread_create                      = 0x00020050;
+const OFFSET_lk_sceKernelSendNotificationRequest    = 0x00004430;
+const OFFSET_lk_scePthreadAttrDestroy               = 0x0000F8F0;
+const OFFSET_lk_scePthreadAttrInit                  = 0x00014290;
+const OFFSET_lk_scePthreadAttrSetdetachstate        = 0x0000B710;
+const OFFSET_lk_scePthreadAttrSetstacksize          = 0x0000BC10;
+const OFFSET_lk_scePthreadCreate                    = 0x00007620;
+const OFFSET_lk_scePthreadJoin                      = 0x0000AD20;
+const OFFSET_lk_sysctlbyname                        = 0x00012D80;
+const OFFSET_lc_free                                = 0x00006020;
+const OFFSET_lc_malloc                              = 0x00006010;
+const OFFSET_lc_memcmp                              = 0x0003FBC0;
+const OFFSET_lc_memcpy                              = 0x00003E50;
+const OFFSET_lc_strcmp                              = 0x0003FC00;
+const OFFSET_lc_vsnprintf                           = 0x0005BF60;
+const OFFSET_lk__thread_list                        = 0x00064218;
+const OFFSET_lk_worker_wait_return                  = 0x0001E811;
+const OFFSET_KERNEL_ALLPROC                         = 0x034E5D50;
+const OFFSET_KERNEL_DATA                            = 0x00C70000;
+const OFFSET_KERNEL_QA_FLAGS                        = 0x01733088;
+/* rootvnode, derived from this firmware's own x86_kernel.elf.
+ * main.js does:  rootvnode = krw.read8(get_kaddr(OFFSET_KERNEL_ROOTVNODE))
+ * then writes it to procFd+0x10 and +0x18 to escape the sandbox, so a wrong
+ * value is a kernel read at a garbage address - it MUST be right.
+ * Signature (unique, exactly one match per kernel):
+ *     48 8B 7D A8    mov rdi, [rbp-0x58]
+ *     48 89 3D ..    mov [rip+X], rdi        <- the store to rootvnode
+ * The method reproduces the known-good values on TWO anchors we already have:
+ * 9.00 -> 0x03C7B510 and 12.00 -> 0x03E27510, both exact matches.
+ * Range-checked: value sits past OFFSET_KERNEL_DATA and inside the image. */
+const OFFSET_KERNEL_ROOTVNODE                       = 0x03D6B510;
+const OFFSET_KERNEL_SECURITY_FLAGS                  = 0x01733064;
+const OFFSET_KERNEL_TARGETID                        = 0x0173306D;
+const OFFSET_KERNEL_UTOKEN_FLAGS                    = 0x017330F0;

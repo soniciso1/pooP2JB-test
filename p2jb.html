@@ -1573,6 +1573,7 @@ let LADDER = [];
 let currentKey = "";
 let ctx = null;
 
+
 /* WEBKIT-ONLY SENDER.
  *
  * The payload menu can be reached without running the exploit in this page - via
@@ -2090,6 +2091,27 @@ async function main() {
                 flushMark("P2JB-LOAD-FAIL", why.slice(0, 100));
                 try { stage("P2JB LOAD FAILED: " + why, "bad"); } catch (e2) { }
                 try { screenMark("P2JB-LOAD-FAIL", why); } catch (e2) { }
+            }
+            /* Publish the in-console ELF sender before bailing out.
+               makePoopsEngine() is what exports window.__sendElfDirect, and it only runs
+               inside makeContext() - which sits BELOW this early return, on poops's own
+               ladder. So on a p2jb run the payload tiles had no direct sender and fell
+               back to fetch("api/payload/<name>"). That route exists on ps-exploit-host,
+               which is why this was invisible locally, but a static host such as GitHub
+               Pages answers 404 -> the handler throws -> every tile goes red WITHOUT
+               sending anything. poopsploit was unaffected because its run reaches
+               makeContext() normally.
+               makeContext() is pure construction - it builds a ctx of existing references,
+               calls the makePoopsEngine factory and setFamily(). It runs no exploit code,
+               writes no kernel memory and is not async, so it is safe here.
+               Firmware-independent: this branch is not version-gated, so the bug and the
+               fix apply identically to 12.00/12.02/12.20/12.40/12.60/12.70.
+               Non-fatal by design: on failure the tiles simply fall back to api/payload,
+               which is exactly the old behaviour. */
+            try { makeContext(); }
+            catch (e) {
+                flushMark("P2JB-SENDER", "makeContext-failed-"
+                    + String((e && e.message) || e).slice(0, 60));
             }
             runInFlight = false;
             return; // do NOT run poops's own kernel engine below

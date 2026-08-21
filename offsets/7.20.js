@@ -3,11 +3,37 @@
 
 // no host-constructor value for this firmware
 const OFFSET_wk_host_constructor_candidates = [];
-const OFFSET_wk_vtable_first_element     = 0; // needs a console
+/* Re-derived 2026-08-21. The previous value came from a 'unique mov eax,0x37; ret'
+ * heuristic and was WRONG for this whole range - on 7.00 it pointed at 0x65C4E0,
+ * which is slot 0 of a single 3-slot vtable, not a DOM element. main.js does:
+ *   vt = read8(read8(leakval(textarea)+0x18)); base = read8(vt) - THIS
+ * so this must be the target of slot 0 of HTMLTextAreaElement's vtable. That
+ * function is a base virtual shared by exactly 214 large (>=100 slot) vtables
+ * on EVERY firmware 6.00-8.60, which is how it is identified.
+ * Cross-checked on a 7.00 devkit: the leaked vtable[0] was 0x818865720, and
+ * 0x3D720 is the only large-vtable slot0 whose value mod 0x4000 matches, giving
+ * base 0x818828000 - 16K aligned and in the user-module band. The old value
+ * produced 0x818209240, which is not page aligned, and every module base
+ * derived from it (lk, lc) came out as garbage.
+ * previous (wrong): 0x0065C4E0 */
+const OFFSET_wk_vtable_first_element     = 0x0003D720;
+
 const OFFSET_wk_memset_import                  = 0x03E16EE0;
 const OFFSET_wk___stack_chk_guard_import       = 0x03E14910;
 
 const OFFSET_lk___stack_chk_guard              = 0x0006D1D0;
+/* __thread_list, derived from this firmware's own libkernel_web.sprx.
+ * Located by the pthread link-insert signature (identical shape on every
+ * build): mov rcx,[rip+X] ; lea rdx,[reg+0x38] ; lea rsi,[rcx+0x38] ;
+ * mov [reg+0x38],rcx ; cmove rsi,rax ; mov [rsi+8],rdx ;
+ * mov [rip+Y],reg ; mov [reg+0x40],rax ; or byte [reg+0x19c],2
+ * i.e. a doubly-linked insert with next=+0x38 / prev=+0x40, matching
+ * ChendoChap's PTHREAD_NEXT_THREAD_OFFSET. Match site on 7.20: 0x02B9C0.
+ * The method reproduces the known-good 0x64218 on 8.00-8.60 exactly,
+ * and 8.00 was confirmed on hardware (thread list slot 0x8019fc218
+ * minus lk base 0x801998000 = 0x64218). NOTE 6.xx is 0x64208, NOT 0x64218. */
+const OFFSET_lk__thread_list                   = 0x00064218;
+
 const OFFSET_lk_pthread_create_name_np         = 0x00001CE0;
 const OFFSET_lk_pthread_join                   = 0x00032860;
 const OFFSET_lk_pthread_exit                   = 0x00022670;
@@ -380,3 +406,39 @@ let syscall_map = {
 	0x2D2: 0x00036020,
 	0x2D5: 0x00037690,
 };
+
+// ---- derived offline 2026-08-20 (NID / signature / xref), UNTESTED on hardware ----
+const OFFSET_lk_getpid                              = 0x000367A0;
+const OFFSET_lk_pthread_create                      = 0x00030190;
+const OFFSET_lk_sceKernelSendNotificationRequest    = 0x00008BE0;
+const OFFSET_lk_scePthreadAttrDestroy               = 0x00020570;
+const OFFSET_lk_scePthreadAttrInit                  = 0x00029630;
+const OFFSET_lk_scePthreadAttrSetdetachstate        = 0x00016F00;
+const OFFSET_lk_scePthreadAttrSetstacksize          = 0x00017700;
+const OFFSET_lk_scePthreadCreate                    = 0x0000E240;
+const OFFSET_lk_scePthreadJoin                      = 0x00014A80;
+const OFFSET_lk_sysctlbyname                        = 0x00027370;
+const OFFSET_lc_free                                = 0x00005E90;
+const OFFSET_lc_malloc                              = 0x00005E80;
+const OFFSET_lc_memcmp                              = 0x00040890;
+const OFFSET_lc_memcpy                              = 0x00003CD0;
+const OFFSET_lc_strcmp                              = 0x000408D0;
+const OFFSET_lc_vsnprintf                           = 0x0005C620;
+const OFFSET_lk_worker_wait_return                  = 0x00038A11;
+const OFFSET_KERNEL_ALLPROC                         = 0x034A9D50;
+const OFFSET_KERNEL_DATA                            = 0x00C50000;
+const OFFSET_KERNEL_QA_FLAGS                        = 0x01718088;
+/* rootvnode, derived from this firmware's own x86_kernel.elf.
+ * main.js does:  rootvnode = krw.read8(get_kaddr(OFFSET_KERNEL_ROOTVNODE))
+ * then writes it to procFd+0x10 and +0x18 to escape the sandbox, so a wrong
+ * value is a kernel read at a garbage address - it MUST be right.
+ * Signature (unique, exactly one match per kernel):
+ *     48 8B 7D A8    mov rdi, [rbp-0x58]
+ *     48 89 3D ..    mov [rip+X], rdi        <- the store to rootvnode
+ * The method reproduces the known-good values on TWO anchors we already have:
+ * 9.00 -> 0x03C7B510 and 12.00 -> 0x03E27510, both exact matches.
+ * Range-checked: value sits past OFFSET_KERNEL_DATA and inside the image. */
+const OFFSET_KERNEL_ROOTVNODE                       = 0x03D17510;
+const OFFSET_KERNEL_SECURITY_FLAGS                  = 0x01718064;
+const OFFSET_KERNEL_TARGETID                        = 0x0171806D;
+const OFFSET_KERNEL_UTOKEN_FLAGS                    = 0x017180F0;

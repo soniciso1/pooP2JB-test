@@ -6,9 +6,13 @@ LAN IPs or hostnames anywhere in the site.
 
 FIRMWARE SUPPORT
 ----------------
-  Poopsploit   9.00 - 12.00   (IPv6 rthdr UAF)
+  Poopsploit   7.00 - 12.00   (IPv6 rthdr UAF)
   P2JB        12.00 - 12.70   (cr_ref overflow via kqueueex; ~1 hour leak)
 index.html detects the console firmware and greys out whichever exploit cannot run.
+7.00-8.60 is the Safari 15.4 range and uses core.js's LOWFW_VIEW path. Every offset in
+7.00-12.70 was verified offline against that firmware's own retail binaries (22,904
+checks, 0 defects); 7.00, 9.05, 12.00, 12.40 and 12.70 are also proven on hardware.
+6.00-6.50 is deliberately NOT offered: those profiles still lack lk_worker_wait_return.
 Both are selectable on 12.00, the one firmware they overlap on.
 
 Verified on hardware: 12.00 (both exploits) and 12.70 (p2jb, full chain to elfldr).

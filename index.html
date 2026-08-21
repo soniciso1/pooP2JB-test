@@ -120,13 +120,18 @@ body{
 
 // FIRMWARE GATING. Each exploit covers a different range, and 12.00 is the only firmware
 // both can do:
-//     Poopsploit   9.00 - 12.00   (IPv6 rthdr UAF; its kernel offsets stop at 12.00)
+//     Poopsploit   7.00 - 12.00   (IPv6 rthdr UAF; its kernel offsets stop at 12.00)
+// 7.00-8.60 is the Safari 15.4 range: it needs core.js's LOWFW_VIEW path (m_mode at
+// +0x20, rotating K) and the 7.xx/8.xx offset profiles. Every constant in 7.00-12.70
+// was verified offline against that firmware's own retail binaries; 7.00, 9.05, 12.00,
+// 12.40 and 12.70 are additionally proven on hardware. 6.00-6.50 stays OFF - those
+// profiles are still missing lk_worker_wait_return.
 //     P2JB        12.00 - 12.70   (cr_ref overflow via kqueueex)
 // The one that cannot run on this console is greyed out and taken out of the tab order,
 // so a wrong click is not possible. Firmware is parsed, not assumed 4 chars: "12.0" was
 // being read out of 12.02 by an earlier version.
 var RANGES = {
-    btnpoops: { lo: 900, hi: 1200, name: "Poopsploit", range: "9.00-12.00" },
+    btnpoops: { lo: 700, hi: 1200, name: "Poopsploit", range: "7.00-12.00" },
     btnp2jb:  { lo: 1200, hi: 1270, name: "P2JB",       range: "12.00-12.70" }
 };
 
@@ -160,7 +165,7 @@ var RANGES = {
     if (msg) {
         msg.textContent = usable.length
             ? "firmware " + fw
-            : "firmware " + fw + " — not supported (Poopsploit 9.00-12.00, P2JB 12.00-12.70)";
+            : "firmware " + fw + " — not supported (Poopsploit 7.00-12.00, P2JB 12.00-12.70)";
     }
     // focus whichever entry is actually usable
     var first = document.querySelector(".btn:not(.disabled)");
