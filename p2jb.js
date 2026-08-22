@@ -3582,9 +3582,44 @@
                 bin[0x10fb + i] = KEXP_GETPID_TAIL[i];
             for (let i = 0x1101; i < 0x1106; i++) bin[i] = 0x90;
 
+            /* SILENCE THE THREE HEAVY-STACK LOG CALLS IN THE elfldr WINDOW.
+             *
+             * kexp has two printf-style loggers. The one at 0x980 opens with `sub rsp, 0xf0`
+             * (240 bytes) and is called from 64 sites - harmless. The one at 0x8b0 opens with
+             * `sub rsp, 0xd00`, a 3328-byte frame, and three of its seven call sites run on
+             * the freshly created elfldr KERNEL thread:
+             *
+             *     0x126d  "Created elfldr thread with id %i !!"
+             *     0x12ad  "elfldr returned %#lx !!"
+             *     0x3bc2  "qa flags patches applied !!"
+             *
+             * A 3.3KB frame on that thread overruns its stack into the guard page, and
+             * FreeBSD reports a guard hit as `panic: vm_fault: fault on nofault entry`. Our
+             * UART capture ends at "[kexp] init loader started..." with exactly that panic -
+             * the next line would have been the 0x126d call.
+             *
+             * j0rdy's slopkit ships this same blob (same name, same 18912 bytes) with exactly
+             * these three calls NOPed; we shipped the un-silenced original, which is the only
+             * difference between the two files. Patch them here rather than editing the blob,
+             * so payloads/kexp_2026_05_25.bin stays byte-identical to upstream and the change
+             * is visible in the diff. The signature checks above (0x1c, 0x23, 0x10f1) sit
+             * nowhere near these offsets and still pass.
+             *
+             * Each site is checked for a real 0xE8 call first, so running against an already
+             * silenced blob is a no-op rather than corruption.
+             */
+            const KEXP_LOG_CALLS = [0x126D, 0x12AD, 0x3BC2];
+            let log_nopped = 0;
+            for (const off of KEXP_LOG_CALLS) {
+                if (bin[off] !== 0xE8) continue;
+                for (let i = 0; i < 5; i++) bin[off + i] = 0x90;
+                log_nopped++;
+            }
+
             window.syncMark("KEXP-RESOLVER", "slots=11 getpid=" + toHex(getpid)
                 + " kbase=" + toHex(kbase) + " cbase=" + toHex(cbase)
-                + " (2 resolver calls NOPed, 12 dlsym syscalls skipped)");
+                + " (2 resolver calls NOPed, 12 dlsym syscalls skipped, "
+                + log_nopped + "/3 elfldr-window log calls NOPed)");
             return O;
         }
 
